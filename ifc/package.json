@@ -1,7 +1,7 @@
 {
   "name": "@4d-id/ifc-adapter",
   "version": "0.3.0",
-  "description": "Import an IFC (BIM) file into 4D-ID entities: spatial hierarchy, identity, IFC GlobalId, and semantics, translate once at the edge.",
+  "description": "Implemented IFC-to-4D-ID record adapter using caller-supplied grounding; creates standalone records and carries IfcGlobalId aliases.",
   "type": "module",
   "bin": { "4did-ifc": "src/cli.mjs" },
   "files": ["src","samples","README.md","LICENSE"],
