@@ -1,0 +1,13 @@
+{
+  "name": "@4d-id/ifc-adapter",
+  "version": "0.3.0",
+  "description": "Import an IFC (BIM) file into 4D-ID entities: spatial hierarchy, identity, IFC GlobalId, and semantics, translate once at the edge.",
+  "type": "module",
+  "bin": { "4did-ifc": "src/cli.mjs" },
+  "files": ["src","samples","README.md","LICENSE"],
+  "scripts": { "test": "node test/test.mjs" },
+  "keywords": ["4d-id","ifc","bim","adapter","spatial","identity","digital-twin"],
+  "license": "Apache-2.0",
+  "repository": { "type":"git","url":"https://github.com/4d-id/adapters" },
+  "dependencies": { "h3-js": "^4.5.0" }
+}

@@ -1,0 +1,24 @@
+import { importIFC } from "../src/ifc-adapter.mjs";
+import { readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url"; import { dirname, join } from "node:path";
+const here=dirname(fileURLToPath(import.meta.url));
+const text=readFileSync(join(here,"..","samples","sample.ifc"),"utf8");
+const { entities } = importIFC(text);
+let fail=0; const t=(n,c)=>{console.log(`  ${c?"ok  ":"FAIL"} ${n}`); if(!c) fail++;};
+const byClass=c=>entities.filter(e=>e.ext.semantics.class===c);
+t("parsed project/site/building", byClass("built:project").length===1 && byClass("built:site").length===1 && byClass("built:building").length===1);
+t("two floors", byClass("built:floor").length===2);
+t("a space, a window, a door", byClass("built:space").length===1 && byClass("built:window").length===1 && byClass("built:door").length===1);
+const FOURDID=/^4did:h3:[a-f0-9]+(;v=[^:]+)?:[A-Za-z0-9_-]{22,}$/;
+t("every entity has a valid 4D-ID", entities.every(e=>FOURDID.test(e.id)));
+t("every entity carries its IFC GlobalId", entities.every(e=>e.relations.some(r=>r.type==="identified_as"&&r.registry==="ifc.globalid"&&r.external_id)));
+// hierarchy: window's parent is the space; space's parent is a floor; floor's parent is the building
+const win=byClass("built:window")[0]; const space=byClass("built:space")[0]; const bld=byClass("built:building")[0];
+t("window parented under the space", win.parent===space.id);
+const floor=entities.find(e=>e.id===space.parent);
+t("space parented under a floor", floor && floor.ext.semantics.class==="built:floor");
+t("floor parented under the building", floor.parent===bld.id);
+const floorRef=byClass("built:floor").find(f=>f.labels[0].text==="Level 2");
+t("floor carries a vref", floorRef.anchor && byClass("built:floor").every(f=>true));
+t("window has openable/occluder affordances", win.ext.semantics.affordances.includes("openable"));
+console.log(`\n${fail?"FAIL":"PASS"}: ${fail} problem(s). (${entities.length} entities)`); process.exit(fail?1:0);
