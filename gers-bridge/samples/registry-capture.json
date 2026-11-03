@@ -1,0 +1,12 @@
+{
+  "capture_id": "cap-2026-10-22-buildings-sample",
+  "release": "2026-10-22.0",
+  "captured_at": "2026-10-22T00:00:00Z",
+  "themes": ["buildings"],
+  "max_age_days": 3650,
+  "ids": [
+    "08b2a1c4-5d6e-4f70-8192-a3b4c5d6e7f8",
+    "1c9d4e2b-77a3-4b51-9e0c-2f6a8d13b4c5",
+    "2e5f7a09-3b14-4c86-a7d2-9e03f5b6c8d1"
+  ]
+}

@@ -1,0 +1,27 @@
+{
+  "manifest_version": 1,
+  "source": {
+    "registry": "acme.facilities",
+    "dataset": "acme-retail-sites-2026q4",
+    "theme": "buildings"
+  },
+  "home_token": "acme",
+  "fields": {
+    "local_id": "facility_id",
+    "gers_id": "gers_id",
+    "label": "name",
+    "parent_local_id": "campus_id",
+    "theme": "overture_theme"
+  },
+  "binding": {
+    "source": "self_asserted",
+    "attributed_to": "acme-facilities-team"
+  },
+  "policy": {
+    "min_binding_trust": "onboarding_service",
+    "mint_on": [
+      "verified_absent"
+    ],
+    "allow_mint": true
+  }
+}

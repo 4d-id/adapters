@@ -1,0 +1,16 @@
+{
+  "name": "@4d-id/gers-bridge",
+  "version": "0.1.0",
+  "description": "Reference-only bridge between Overture GERS identifiers and 4D-IDs: registry-capture membership verification, source-binding trust, and resolve-before-mint planning.",
+  "type": "module",
+  "main": "src/index.mjs",
+  "exports": { ".": "./src/index.mjs" },
+  "bin": { "4did-gers": "src/cli.mjs" },
+  "files": ["src", "samples", "README.md", "LICENSE"],
+  "engines": { "node": ">=18" },
+  "scripts": { "test": "node test/test.mjs" },
+  "keywords": ["4d-id", "gers", "overture", "adapter", "spatial", "identity", "bridge"],
+  "license": "Apache-2.0",
+  "repository": { "type": "git", "url": "https://github.com/4d-id/adapters" },
+  "dependencies": {}
+}

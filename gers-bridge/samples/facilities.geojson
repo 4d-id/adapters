@@ -1,0 +1,98 @@
+{
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "type": "Feature",
+      "geometry": { "type": "Point", "coordinates": [-122.3321, 47.6062] },
+      "properties": {
+        "facility_id": "ACME-CAMPUS-01",
+        "name": "Acme Seattle Campus",
+        "overture_theme": "buildings",
+        "gers_id": "08b2a1c4-5d6e-4f70-8192-a3b4c5d6e7f8",
+        "gers_binding": {
+          "source": "bridge_file",
+          "release": "2026-10-22.0",
+          "source_record_id": "osm:way/123456789",
+          "attributed_to": "overture"
+        }
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": { "type": "Point", "coordinates": [-122.3325, 47.6065] },
+      "properties": {
+        "facility_id": "ACME-BLDG-A",
+        "campus_id": "ACME-CAMPUS-01",
+        "name": "Building A",
+        "overture_theme": "buildings",
+        "gers_id": "1c9d4e2b-77a3-4b51-9e0c-2f6a8d13b4c5",
+        "gers_binding": {
+          "source": "onboarding_service",
+          "method": "geometry-match",
+          "attributed_to": "example-onboarding-co"
+        }
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": { "type": "Point", "coordinates": [-122.3329, 47.6068] },
+      "properties": {
+        "facility_id": "ACME-BLDG-B",
+        "campus_id": "ACME-CAMPUS-01",
+        "name": "Building B (GERS id typed in by hand)",
+        "overture_theme": "buildings",
+        "gers_id": "2e5f7a09-3b14-4c86-a7d2-9e03f5b6c8d1"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": { "type": "Point", "coordinates": [-122.3340, 47.6070] },
+      "properties": {
+        "facility_id": "ACME-BLDG-C",
+        "campus_id": "ACME-CAMPUS-01",
+        "name": "Building C (new construction, not yet in Overture)",
+        "overture_theme": "buildings",
+        "gers_id": "9f8e7d6c-5b4a-4938-8271-605f4e3d2c1b",
+        "gers_binding": {
+          "source": "onboarding_service",
+          "method": "address-match",
+          "attributed_to": "example-onboarding-co"
+        }
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": { "type": "Point", "coordinates": [-122.3350, 47.6075] },
+      "properties": {
+        "facility_id": "ACME-KIOSK-9",
+        "name": "Kiosk 9 (no GERS id offered)",
+        "overture_theme": "buildings"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": { "type": "Point", "coordinates": [-122.3360, 47.6080] },
+      "properties": {
+        "facility_id": "ACME-BAD-ID",
+        "name": "Record with a malformed GERS id",
+        "overture_theme": "buildings",
+        "gers_id": "not-a-uuid-at-all"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": { "type": "Point", "coordinates": [-122.3370, 47.6085] },
+      "properties": {
+        "facility_id": "ACME-PLACE-7",
+        "name": "Cafe 7 (a place, not a building)",
+        "overture_theme": "places",
+        "gers_id": "4d3c2b1a-9e8f-4706-b5a4-938271605f4e",
+        "gers_binding": {
+          "source": "onboarding_service",
+          "method": "name-and-address",
+          "attributed_to": "example-onboarding-co"
+        }
+      }
+    }
+  ]
+}
