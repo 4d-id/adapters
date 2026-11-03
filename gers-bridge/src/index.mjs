@@ -7,7 +7,24 @@
 //
 // It performs no grounding. See README "Grounding boundary".
 
-export { classifyGersSyntax, normalizeGersId, mint4did, isNonSpatial4did, FOURDID_ID_RE } from "./identity.mjs";
+export {
+  classifyGersSyntax,
+  normalizeGersId,
+  mint4did,
+  isNonSpatial4did,
+  parseNonSpatial4did,
+  FOURDID_ID_RE,
+} from "./identity.mjs";
+export {
+  generateHomeToken,
+  validateHomeToken,
+  isValidHomeToken,
+  homeTokenProvenance,
+  maxEntropyBits,
+  ENTROPY_SOURCE,
+  HOME_TOKEN_BYTES,
+  MIN_HOME_TOKEN_BITS,
+} from "./home-token.mjs";
 export { MEMBERSHIP, createRegistryVerifier, createUnknownVerifier } from "./membership.mjs";
 export { BINDING, bindingRank, meetsBindingTrust, classifyBinding } from "./trust.mjs";
 export { parseManifest, parseInput, normalizeRecords } from "./input.mjs";

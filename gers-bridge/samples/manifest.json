@@ -5,7 +5,7 @@
     "dataset": "acme-retail-sites-2026q4",
     "theme": "buildings"
   },
-  "home_token": "acme",
+  "home_token": "5a89fc81f07739510a815e8c202160ac",
   "fields": {
     "local_id": "facility_id",
     "gers_id": "gers_id",

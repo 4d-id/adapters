@@ -1,11 +1,11 @@
 [
   {
-    "id": "4did:id:acme:CLKhxF1uR3CBkqO0xdXm-A",
+    "id": "4did:id:5a89fc81f07739510a815e8c202160ac:CLKhxF1uR3CBkqO0xdXm-A",
     "registry": "acme.facilities",
     "external_id": "ACME-CAMPUS-01"
   },
   {
-    "id": "4did:id:acme:CLKhxF1uR3CBkqO0xdXm-A",
+    "id": "4did:id:5a89fc81f07739510a815e8c202160ac:CLKhxF1uR3CBkqO0xdXm-A",
     "registry": "overture.gers",
     "external_id": "08b2a1c4-5d6e-4f70-8192-a3b4c5d6e7f8"
   }

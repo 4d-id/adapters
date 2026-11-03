@@ -8,6 +8,7 @@
 
 import { BINDING } from "./trust.mjs";
 import { MEMBERSHIP } from "./membership.mjs";
+import { validateHomeToken } from "./home-token.mjs";
 
 const MANIFEST_VERSION = 1;
 
@@ -52,7 +53,18 @@ export function parseManifest(raw) {
     throw new Error("manifest.source.registry is required: name the registry the local ids live in");
   }
   if (!raw.home_token) {
-    throw new Error("manifest.home_token is required: 4D-IDs are minted under a home token");
+    throw new Error(
+      "manifest.home_token is required: non-spatial 4D-IDs are minted under an opaque home token. " +
+        "Generate one with `4did-gers home-token` — it must carry at least 128 bits from a CSPRNG " +
+        "and encode no place, person, or time (4D-ID 2.4 /req/core/genesis-privacy)."
+    );
+  }
+  const tokenCheck = validateHomeToken(raw.home_token);
+  if (!tokenCheck.ok) {
+    throw new Error(
+      `manifest.home_token is not a valid non-spatial home token: ${tokenCheck.reason}. ` +
+        `Generate one with \`4did-gers home-token\`.`
+    );
   }
 
   const fields = raw.fields ?? {};

@@ -9,7 +9,7 @@ Bridges that make existing tools emit and consume 4D-IDs, so the candidate stand
 | [`ifc`](ifc/) | Import an IFC (BIM) file into 4D-ID entities: hierarchy, identity, IfcGlobalId, semantics. Emits schema-valid records that can be evaluated by the reference resolver. | **Implemented** |
 | [`gers-bridge`](gers-bridge/) | Bridge Overture GERS identifiers to 4D-IDs. Verifies GERS membership against a registry capture, keeps source-binding trust separate from membership, and resolves before it mints. Emits non-spatial, reference-only identifiers and typed sidecar edges. | **Implemented** |
 
-Both are reference implementations, not production-hardened software, and neither is published to npm. The GERS bridge in particular performs **no grounding**: it mints only non-spatial `4did:id:` identifiers marked reference-only and provisional, never infers GERS membership from UUID syntax, and treats a failed lookup as `unknown` rather than as a no-match. Its HTTP resolver adapter is read-only and will not call `/ingest`.
+Both are reference implementations, not production-hardened software, and neither is published to npm. The GERS bridge in particular performs **no grounding**: it mints only non-spatial `4did:id:` identifiers marked reference-only and provisional, never infers GERS membership from UUID syntax, and treats a failed lookup as `unknown` rather than as a no-match. Its home tokens carry at least 128 bits from a CSPRNG and encode no place, person, or time, per 4D-ID 2.4 `/req/core/genesis-privacy`. Its HTTP resolver adapter is read-only and will not call `/ingest`.
 
 ## Planned
 

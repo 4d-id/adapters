@@ -7,6 +7,7 @@
 import { readFileSync, writeFileSync } from "node:fs";
 import { parseManifest, parseInput, normalizeRecords } from "./input.mjs";
 import { createRegistryVerifier, createUnknownVerifier } from "./membership.mjs";
+import { generateHomeToken, homeTokenProvenance } from "./home-token.mjs";
 import { createMemoryResolverReader, createHttpResolverReader } from "./resolver.mjs";
 import { createJsonFileStore } from "./store.mjs";
 import { planImport } from "./plan.mjs";
@@ -15,6 +16,7 @@ import { applyPlan, inspectPlan, exportBridge, serializeExport } from "./apply.m
 const USAGE = `4did-gers — reference-only Overture GERS <-> 4D-ID bridge
 
 Usage:
+  4did-gers home-token [--json]
   4did-gers plan    --input=<file> --manifest=<file> [--capture=<file>]
                     [--resolver=<url> | --aliases=<file>] [--format=auto|geojson|jsonl]
                     [--out=<file>]
@@ -23,6 +25,8 @@ Usage:
   4did-gers export  --plan=<file> [--store=<file>] [--out=<file>]
 
 Notes:
+  home-token mints an opaque 128-bit home token for a manifest. It encodes no
+    place, person, or time (4D-ID 2.4 /req/core/genesis-privacy).
   --resolver is READ-ONLY. This CLI never posts to /ingest.
   apply requires --reference-only: there is no authoritative write mode.
   Without --capture, every membership answer is "unknown" and nothing mints.
@@ -94,7 +98,31 @@ async function buildPlan() {
   return plan;
 }
 
+// Operator errors (a bad manifest, an unreadable file) deserve a clear message
+// and a non-zero exit, not a stack trace.
+try {
+  await main();
+} catch (e) {
+  process.stderr.write(`${e && e.message ? e.message : e}\n`);
+  process.exit(2);
+}
+
+async function main() {
 switch (cmd) {
+  case "home-token": {
+    const token = generateHomeToken();
+    if (flag("json")) {
+      emit(homeTokenProvenance(token, { generated: true }), flag("out"));
+    } else {
+      process.stdout.write(`${token}\n`);
+      process.stderr.write(
+        "128 bits from the OpenSSL CSPRNG; encodes no place, person, or time.\n" +
+          "Put this in your manifest's \"home_token\" field.\n"
+      );
+    }
+    break;
+  }
+
   case "plan": {
     emit(await buildPlan(), flag("out"));
     break;
@@ -150,4 +178,5 @@ switch (cmd) {
   default:
     process.stderr.write(USAGE);
     process.exit(cmd ? 2 : 0);
+}
 }

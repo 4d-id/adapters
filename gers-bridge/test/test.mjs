@@ -13,6 +13,12 @@ import {
   classifyGersSyntax,
   mint4did,
   isNonSpatial4did,
+  parseNonSpatial4did,
+  generateHomeToken,
+  validateHomeToken,
+  maxEntropyBits,
+  homeTokenProvenance,
+  MIN_HOME_TOKEN_BITS,
   MEMBERSHIP,
   createRegistryVerifier,
   createUnknownVerifier,
@@ -67,6 +73,10 @@ const CAPTURE = {
   ],
 };
 const NOW = () => new Date("2026-10-25T00:00:00Z"); // 3 days after capture
+
+// A fixed, spec-valid home token: 32 hex chars = 128 bits, opaque, and encoding
+// no place, person, or time. Fixed (not generated) so tests stay deterministic.
+const HOME = "5a89fc81f07739510a815e8c202160ac";
 const PRESENT = "08b2a1c4-5d6e-4f70-8192-a3b4c5d6e7f8";
 const ABSENT = "9f8e7d6c-5b4a-4938-8271-605f4e3d2c1b"; // valid UUIDv4, not in capture
 
@@ -82,7 +92,7 @@ function seqUuid(start = 0) {
 const MANIFEST = parseManifest({
   manifest_version: 1,
   source: { registry: "acme.facilities", dataset: "test", theme: "buildings" },
-  home_token: "acme",
+  home_token: HOME,
   fields: {
     local_id: "facility_id",
     gers_id: "gers_id",
@@ -176,15 +186,141 @@ section("membership: syntax is never membership");
 }
 
 // ===========================================================================
+section("home tokens: >=128 bits, no place/person/time (/req/core/genesis-privacy)");
+// ===========================================================================
+
+{
+  // A — generated tokens meet the floor and are unique
+  const tokens = new Set();
+  let allValid = true;
+  let minBits = Infinity;
+  for (let i = 0; i < 200; i++) {
+    const tk = generateHomeToken();
+    tokens.add(tk);
+    const v = validateHomeToken(tk);
+    if (!v.ok) allValid = false;
+    minBits = Math.min(minBits, v.bits);
+  }
+  t(
+    "generateHomeToken yields unique tokens carrying at least 128 bits",
+    tokens.size === 200 && allValid && minBits >= MIN_HOME_TOKEN_BITS,
+    `unique=${tokens.size} valid=${allValid} minBits=${minBits}`
+  );
+
+  // B — short / human-meaningful tokens are rejected on the entropy floor.
+  // "acme" is the exact mistake this guards: meaningful, and nowhere near 128 bits.
+  const shortCases = ["acme", "acme-facilities", "a", "0123456789abcdef"]; // last = 64 bits
+  t(
+    "rejects short and human-meaningful home tokens below the 128-bit floor",
+    shortCases.every((c) => validateHomeToken(c).ok === false),
+    JSON.stringify(shortCases.map((c) => [c, validateHomeToken(c).reason]))
+  );
+
+  // C — entropy accounting is by alphabet and length
+  t(
+    "entropy is bounded by alphabet and length, not assumed",
+    maxEntropyBits("0".repeat(32)) === 128 && // 32 hex chars = 128 bits
+      maxEntropyBits("0".repeat(31)) === 124 && // one short -> under the floor
+      validateHomeToken("0".repeat(31)).ok === false,
+    `${maxEntropyBits("0".repeat(32))}/${maxEntropyBits("0".repeat(31))}`
+  );
+
+  // D — tokens that encode place or time are refused even at full length.
+  // Note these are mid-token, not at the ends: a home token is one continuous
+  // alphanumeric run, so a word-boundary-anchored check would miss all of them.
+  const leaky = [
+    "zzzz20260503T141500Zzzzzzzzzzzzzzz", // ISO basic timestamp
+    "zzzzzzzzzzzzzz20260503zzzzzzzzzzzz", // a date
+    "zzzzzzzz8928308280fffffzzzzzzzzzzz", // an H3 cell index
+    "zzzzzzzzzzzzzzzzzzgeozzzzzzzzzzzzz", // a place keyword
+    "zzzzzzzzzzzzzzz1760000000zzzzzzzzz", // a unix epoch
+    "zzzzzzzzzzzzzzzzzpostcodezzzzzzzzz", // a postcode keyword
+  ];
+  t(
+    "refuses home tokens that encode a place or a time mid-token, at full length",
+    leaky.every((c) => validateHomeToken(c).ok === false),
+    JSON.stringify(leaky.filter((c) => validateHomeToken(c).ok))
+  );
+
+  // D2 — the generator redraws rather than emitting a token that merely *looks*
+  // like it leaks a timestamp, even though such a draw is genuinely random.
+  {
+    const dateish = Buffer.from("aa20260503aabbccddeeff00112233445566", "hex");
+    let calls = 0;
+    const scripted = (n) => {
+      calls++;
+      // first draw looks like a date; subsequent draws are clean
+      return calls === 1 ? dateish.subarray(0, n) : Buffer.alloc(n, 0xab);
+    };
+    const tk = generateHomeToken({ random: scripted });
+    t(
+      "the generator redraws past a token that merely looks like it encodes a date",
+      calls === 2 && validateHomeToken(tk).ok === true && tk === "ab".repeat(16),
+      JSON.stringify({ calls, tk })
+    );
+  }
+
+  // D3 — a broken random source fails loudly instead of emitting a weak token
+  {
+    let threw = false;
+    let msg = "";
+    try {
+      generateHomeToken({ random: (n) => Buffer.alloc(n, 0), maxAttempts: 3 });
+    } catch (e) {
+      threw = true;
+      msg = e.message;
+    }
+    // all-zero bytes -> "000...0", which trips the epoch/date shapes or floors
+    t(
+      "a degenerate random source either yields a valid token or fails loudly, never silently",
+      threw ? /not random/.test(msg) : validateHomeToken("0".repeat(32)).ok === true,
+      msg
+    );
+  }
+
+  // E — structure is refused: dots/hyphens are where place and person data hides
+  t(
+    "refuses structured tokens with dots or hyphens",
+    validateHomeToken("5a89fc81f0773951.0a815e8c202160ac").ok === false &&
+      validateHomeToken("5a89fc81f0773951-0a815e8c202160ac").ok === false &&
+      validateHomeToken(HOME).ok === true
+  );
+
+  // F — provenance is honest about what it can and cannot verify
+  const gen = homeTokenProvenance(generateHomeToken(), { generated: true });
+  const sup = homeTokenProvenance(HOME);
+  t(
+    "provenance distinguishes a CSPRNG draw from an unverifiable caller-supplied token",
+    gen.verified_random === true &&
+      /CSPRNG/.test(gen.source) &&
+      sup.verified_random === false &&
+      sup.source === "caller-supplied" &&
+      /cannot be verified/.test(sup.note) &&
+      sup.valid === true,
+    JSON.stringify({ gen: gen.verified_random, sup: sup.verified_random })
+  );
+
+  // G — there is deliberately no derivation path
+  const mod = await import("../src/home-token.mjs");
+  t(
+    "the module exposes no way to derive a token from an input",
+    !("deriveHomeToken" in mod) &&
+      !("homeTokenFrom" in mod) &&
+      generateHomeToken.length <= 1, // options bag only; no seed parameter
+    JSON.stringify(Object.keys(mod))
+  );
+}
+
+// ===========================================================================
 section("identity: non-spatial minting");
 // ===========================================================================
 
 {
   // 7
-  const id = mint4did({ homeToken: "acme", uuid: seqUuid(1) });
+  const id = mint4did({ homeToken: HOME, uuid: seqUuid(1) });
   t(
     "mints 4did:id:<home-token>:<uuidv4-base64url> with no cell or pose",
-    id === "4did:id:acme:AAAAAAAAQACAAAAAAAAAAQ" &&
+    id === `4did:id:${HOME}:AAAAAAAAQACAAAAAAAAAAQ` &&
       isNonSpatial4did(id) &&
       !id.includes(";v=") &&
       !id.includes(":h3:"),
@@ -192,13 +328,55 @@ section("identity: non-spatial minting");
   );
 
   // bad home token must throw
-  let threw = false;
+  const mintThrows = (opts) => {
+    try {
+      mint4did(opts);
+      return false;
+    } catch {
+      return true;
+    }
+  };
+  t(
+    "minting rejects an invalid or under-entropy home token",
+    mintThrows({ homeToken: "bad token!", uuid: seqUuid() }) &&
+      mintThrows({ homeToken: "acme", uuid: seqUuid() }) &&
+      mintThrows({ homeToken: undefined, uuid: seqUuid() })
+  );
+
+  // UUIDv7 descriptors are forbidden: their timestamp would encode mint time
+  const v7 = () => "01927a3c-1f2e-7abc-8def-0123456789ab";
+  let v7Msg = "";
   try {
-    mint4did({ homeToken: "bad token!", uuid: seqUuid() });
-  } catch {
-    threw = true;
+    mint4did({ homeToken: HOME, uuid: v7 });
+  } catch (e) {
+    v7Msg = e.message;
   }
-  t("rejects an invalid home token", threw);
+  t(
+    "refuses a UUIDv7 descriptor because it would encode mint time",
+    /UUIDv4/.test(v7Msg) && /mint time/.test(v7Msg),
+    v7Msg
+  );
+
+  // the minted form carries no vref and no genesis marker
+  const parsed = parseNonSpatial4did(id);
+  t(
+    "minted ids carry no vertical reference and no genesis marker",
+    !id.includes(";v=") &&
+      id.split(":").length === 4 &&
+      parsed.variant === "id" &&
+      parsed.home_token === HOME &&
+      // a genesis-suffixed or vref-bearing id is not accepted
+      isNonSpatial4did(`${id}:20260503T141500Z`) === false &&
+      isNonSpatial4did(`4did:id:${HOME};v=floor.2:AAAAAAAAQACAAAAAAAAAAQ`) === false,
+    JSON.stringify(parsed)
+  );
+
+  // an id whose home token is under-entropy is not a valid non-spatial id
+  t(
+    "validation rejects an id whose home token misses the entropy floor",
+    isNonSpatial4did("4did:id:acme:AAAAAAAAQACAAAAAAAAAAQ") === false &&
+      isNonSpatial4did(id) === true
+  );
 }
 
 // ===========================================================================
@@ -249,7 +427,7 @@ section("trust: source binding is separate from membership");
   // record is that feature. Exercised on the reuse path, because that is a path
   // that actually yields an identity to hang edges off — a `review` item has no
   // identity yet and so correctly carries no edges at all.
-  const existing = "4did:id:acme:WEAKBINDxxxxxxxxxxxxxx";
+  const existing = `4did:id:${HOME}:WEAKBINDxxxxxxxxxxxxxx`;
   const plan = await planImport(
     recs([
       feat({
@@ -311,7 +489,7 @@ section("planning: resolve before mint");
 
 {
   // 11 — exact alias reuse wins
-  const existing = "4did:id:acme:EXISTINGxxxxxxxxxxxxxx";
+  const existing = `4did:id:${HOME}:EXISTINGxxxxxxxxxxxxxx`;
   const reader = createMemoryResolverReader([
     { id: existing, registry: "acme.facilities", external_id: "F-1" },
   ]);
@@ -338,8 +516,8 @@ section("planning: resolve before mint");
 {
   // 12 — ambiguity cannot mint
   const reader = createMemoryResolverReader([
-    { id: "4did:id:acme:AAAAAAAAAAAAAAAAAAAAAA", registry: "acme.facilities", external_id: "F-2" },
-    { id: "4did:id:acme:BBBBBBBBBBBBBBBBBBBBBB", registry: "overture.gers", external_id: ABSENT },
+    { id: `4did:id:${HOME}:AAAAAAAAAAAAAAAAAAAAAA`, registry: "acme.facilities", external_id: "F-2" },
+    { id: `4did:id:${HOME}:BBBBBBBBBBBBBBBBBBBBBB`, registry: "overture.gers", external_id: ABSENT },
   ]);
   const plan = await planImport(
     recs([
@@ -690,9 +868,9 @@ section("store: idempotence, concurrency, alias uniqueness");
     mints: [
       {
         local_id: "RACE",
-        id: `4did:id:acme:RACE${String(k).padStart(18, "0")}`,
+        id: `4did:id:${HOME}:RACE${String(k).padStart(18, "0")}`,
         aliases: [{ registry: "acme.facilities", external_id: "RACE" }],
-        record: { id: `4did:id:acme:RACE${String(k).padStart(18, "0")}` },
+        record: { id: `4did:id:${HOME}:RACE${String(k).padStart(18, "0")}` },
       },
     ],
     edges: [],
@@ -731,9 +909,9 @@ section("store: idempotence, concurrency, alias uniqueness");
     mints: [
       {
         local_id: "A",
-        id: "4did:id:acme:AAAAAAAAAAAAAAAAAAAAAA",
+        id: `4did:id:${HOME}:AAAAAAAAAAAAAAAAAAAAAA`,
         aliases: [{ registry: "acme.facilities", external_id: "A" }],
-        record: { id: "4did:id:acme:AAAAAAAAAAAAAAAAAAAAAA" },
+        record: { id: `4did:id:${HOME}:AAAAAAAAAAAAAAAAAAAAAA` },
       },
     ],
   });
@@ -742,7 +920,7 @@ section("store: idempotence, concurrency, alias uniqueness");
   const state = await store.read();
   t(
     "a leftover temp file does not corrupt the published store",
-    state.entities["4did:id:acme:AAAAAAAAAAAAAAAAAAAAAA"] !== undefined &&
+    state.entities[`4did:id:${HOME}:AAAAAAAAAAAAAAAAAAAAAA`] !== undefined &&
       Object.keys(state.entities).length === 1
   );
 }

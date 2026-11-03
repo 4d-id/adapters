@@ -88,19 +88,57 @@ anything; `review` and `blocked` are the operator's queue.
 **This bridge performs no grounding and emits no pose.**
 
 A GERS registry row and a bridge file give an identifier correspondence, not a
-georeferenced pose. So the identifiers minted here are the non-spatial form:
+georeferenced pose. So the identifiers minted here are the non-spatial `id` variant
+of 4D-ID 2.4:
 
 ```
 4did:id:<home-token>:<uuidv4-base64url>
 ```
 
-No cell, no vertical reference, no anchor, no pose. Input geometry is explicitly
-*noted and ignored* — the plan records that it was present and that nothing was
-derived from it. Anything needing grounding must come from a system that actually
-performed it.
+No cell, no vertical reference, no anchor, no genesis marker, no pose. Input
+geometry is explicitly *noted and ignored* — the plan records that it was present
+and that nothing was derived from it.
 
 Everything minted is marked `reference_only: true`, `status: "provisional"`, and
 `grounded: false`. Automation proposes; an authority promotes.
+
+### Home tokens
+
+Per [`/req/core/genesis-privacy`](https://github.com/4d-id/spec) (Part 1, 7.2), the
+home token in the `cell` slot must carry **at least 128 bits of entropy from a
+documented cryptographically secure source** and must **encode no place, person, or
+time — including encoded or hashed derivatives**.
+
+Generate one; don't invent one:
+
+```bash
+4did-gers home-token          # -> 5a89fc81f07739510a815e8c202160ac
+4did-gers home-token --json   # with entropy accounting and provenance
+```
+
+A human-meaningful token like `acme` is **rejected**: it names an organization and
+carries nowhere near 128 bits. Dots and hyphens are rejected too, because structure
+is where place and person data hides.
+
+Two deliberate design choices follow from the "no hashed derivatives" rule:
+
+- **There is no `deriveHomeToken`.** `generateHomeToken()` takes no seed and no
+  namespace. Every such affordance is a way to smuggle place, person, or time into
+  a token, and a SHA-256 of a customer name is indistinguishable from a CSPRNG draw.
+  Generation is the blessed path precisely because validation cannot catch that.
+- **The generator redraws** past any token that merely *looks* like it encodes a
+  date or epoch (about 1 draw in 1,500). Such a token is genuinely random, but a
+  consumer inspecting it cannot tell — and a name that looks like it leaks a
+  timestamp will be read as one. Redrawing is free.
+
+`validateHomeToken` enforces the floor on caller-supplied tokens but is honest about
+its limits: it cannot prove randomness, and it cannot find a place or time encoded
+*inside* a hex token, because any pattern sensitive enough would also reject a large
+fraction of legitimate tokens. Plans therefore record a `home_token_provenance` block
+showing whether randomness was verified or merely asserted.
+
+UUIDv7 descriptors are refused: their embedded timestamp would encode mint time,
+which is exactly what this mode exists to avoid.
 
 ## Edge semantics
 
@@ -126,7 +164,7 @@ bridge starts inventing identity. The operator states which field means what:
 {
   "manifest_version": 1,
   "source": { "registry": "acme.facilities", "theme": "buildings" },
-  "home_token": "acme",
+  "home_token": "5a89fc81f07739510a815e8c202160ac",
   "fields": {
     "local_id": "facility_id",
     "gers_id": "gers_id",
@@ -174,6 +212,7 @@ It is **not** a database. See Limitations.
 ## CLI
 
 ```
+4did-gers home-token [--json]
 4did-gers plan    --input=<file> --manifest=<file> [--capture=<file>]
                   [--resolver=<url> | --aliases=<file>] [--format=auto|geojson|jsonl] [--out=<file>]
 4did-gers apply   --plan=<file> --store=<file> --reference-only
@@ -192,6 +231,10 @@ the honest default, not a degraded one.
 
 - **Not production-hardened, and not published to npm.** This is a reference
   implementation that demonstrates a set of identity-safety properties.
+- Home-token validation enforces an entropy *floor* and screens obvious place/time
+  shapes. It cannot prove a token was drawn from a CSPRNG rather than hashed from a
+  customer id, and it cannot detect place or time encoded inside a hex token. Use
+  `4did-gers home-token` and the compliance burden is discharged by construction.
 - The store is single-host. No multi-host coordination; correctness over NFS or other
   filesystems with weak `rename`/`mkdir` semantics is not claimed. Durability across
   power loss would need directory `fsync`.

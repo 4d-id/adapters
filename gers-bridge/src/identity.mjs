@@ -14,6 +14,7 @@
 //     and must not pretend to have one. See `mint4did` below.
 
 import { randomUUID } from "node:crypto";
+import { validateHomeToken } from "./home-token.mjs";
 
 // ---------------------------------------------------------------------------
 // GERS identifier syntax
@@ -60,8 +61,6 @@ export function normalizeGersId(value) {
 // 4D-ID minting (non-spatial form only)
 // ---------------------------------------------------------------------------
 
-const HOME_TOKEN_RE = /^[A-Za-z0-9][A-Za-z0-9._-]{0,62}$/;
-
 /** Encode a UUID's 16 bytes as unpadded base64url (22 chars). */
 function uuidToBase64Url(uuid) {
   const hex = uuid.replace(/-/g, "");
@@ -76,34 +75,68 @@ function uuidToBase64Url(uuid) {
 /**
  * Mint a non-spatial 4D-ID of the form `4did:id:<home-token>:<uuidv4-base64url>`.
  *
- * The bridge mints the non-spatial variant on purpose. A GERS registry row and a
- * bridge file give us an identifier correspondence, not a georeferenced pose. We
- * have no grounding, so we do not emit a cell, a vertical reference, or a pose.
- * Anything that needs grounding must come from a system that actually performed
- * it; see the grounding-boundary note in the README.
+ * The bridge mints the non-spatial `id` variant on purpose. A GERS registry row
+ * and a bridge file give us an identifier correspondence, not a georeferenced
+ * pose. We have no grounding, so we emit no cell, no vertical reference and no
+ * pose.
+ *
+ * Per 4D-ID 2.4 /req/core/genesis-privacy this function enforces:
+ *
+ *   * the home token carries >=128 bits from a documented CSPRNG and encodes no
+ *     place, person, or time (validated in home-token.mjs);
+ *   * the descriptor is a **UUIDv4** — UUIDv7 is refused, because its timestamp
+ *     would encode mint time, which this mode exists to avoid;
+ *   * no vertical reference and no genesis marker are ever appended.
  *
  * @param {object}   opts
- * @param {string}   opts.homeToken  the minting home/authority token
+ * @param {string}   opts.homeToken  an opaque, validated non-spatial home token
  * @param {Function} [opts.uuid]     injectable UUIDv4 source (tests pass a fixed one)
  */
 export function mint4did({ homeToken, uuid = randomUUID } = {}) {
-  if (!HOME_TOKEN_RE.test(String(homeToken ?? ""))) {
+  const check = validateHomeToken(homeToken);
+  if (!check.ok) {
     throw new Error(
-      `invalid home token ${JSON.stringify(homeToken)}: expected 1-63 chars of [A-Za-z0-9._-] starting alphanumeric`
+      `invalid non-spatial home token: ${check.reason} ` +
+        `(see 4D-ID 2.4 /req/core/genesis-privacy; generate one with generateHomeToken())`
     );
   }
+
   const u = uuid();
   const syntax = classifyGersSyntax(u);
-  if (!syntax.wellFormed || syntax.version !== 4) {
-    throw new Error(`uuid source did not return a UUIDv4: ${JSON.stringify(u)}`);
+  if (!syntax.wellFormed) {
+    throw new Error(`uuid source did not return a UUID: ${JSON.stringify(u)}`);
   }
+  if (syntax.version !== 4) {
+    throw new Error(
+      `descriptor must be a UUIDv4, got UUIDv${syntax.version}: the id variant forbids UUIDv7 ` +
+        `because its embedded timestamp would encode mint time ` +
+        `(4D-ID 2.4 /req/core/genesis-privacy)`
+    );
+  }
+
+  // No ";v=" and no trailing ":<genesis>" — both are forbidden in this mode.
   return `4did:id:${homeToken}:${uuidToBase64Url(syntax.normalized)}`;
 }
 
-export const FOURDID_ID_RE =
-  /^4did:id:[A-Za-z0-9][A-Za-z0-9._-]{0,62}:[A-Za-z0-9_-]{22}$/;
+// Mirrors schemas/common.json: ^4did:id:[A-Za-z0-9.-]{1,64}:[A-Za-z0-9_-]{22,86}$
+// We mint the tighter opaque-token form, so validation below is stricter still.
+export const FOURDID_ID_RE = /^4did:id:[A-Za-z0-9]{22,64}:[A-Za-z0-9_-]{22,86}$/;
 
-/** True when `value` is a well-formed non-spatial 4D-ID as minted here. */
+/**
+ * True when `value` is a well-formed non-spatial 4D-ID whose home token meets
+ * the entropy and opacity rules, and which carries no vref or genesis marker.
+ */
 export function isNonSpatial4did(value) {
-  return typeof value === "string" && FOURDID_ID_RE.test(value);
+  if (typeof value !== "string" || !FOURDID_ID_RE.test(value)) return false;
+  if (value.includes(";v=")) return false; // vertical reference forbidden
+  const parts = value.split(":");
+  if (parts.length !== 4) return false; // a 5th part would be a genesis marker
+  return validateHomeToken(parts[2]).ok;
+}
+
+/** Decompose a non-spatial 4D-ID, or return null if it is not one. */
+export function parseNonSpatial4did(value) {
+  if (!isNonSpatial4did(value)) return null;
+  const [, variant, homeToken, descriptor] = value.split(":");
+  return { variant, home_token: homeToken, descriptor };
 }

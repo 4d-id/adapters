@@ -23,6 +23,7 @@
 import { MEMBERSHIP } from "./membership.mjs";
 import { BINDING, classifyBinding, meetsBindingTrust } from "./trust.mjs";
 import { mint4did } from "./identity.mjs";
+import { homeTokenProvenance } from "./home-token.mjs";
 import { identifiedAsEdge, describesEdge, containsEdge } from "./edges.mjs";
 
 export const OUTCOME = Object.freeze({
@@ -91,6 +92,9 @@ export async function planImport(records, manifest, { reader, verifier, uuid, no
     reference_only: true,
     source: { ...manifest.source },
     home_token: manifest.home_token,
+    // Recorded so a reviewer can see the token met the 128-bit floor and that
+    // its randomness was asserted by the operator rather than proven here.
+    home_token_provenance: homeTokenProvenance(manifest.home_token),
     policy: { ...manifest.policy, mint_on: [...manifest.policy.mint_on] },
     registry_capture: {
       capture_id: verifier.capture_id ?? null,
