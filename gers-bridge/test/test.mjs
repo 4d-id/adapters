@@ -100,7 +100,7 @@ const MANIFEST = parseManifest({
     parent_local_id: "campus_id",
     theme: "overture_theme",
   },
-  policy: { min_binding_trust: BINDING.ONBOARDING_SERVICE, mint_on: [MEMBERSHIP.ABSENT] },
+  policy: { min_binding_trust: BINDING.ONBOARDING_SERVICE, mint_on: [MEMBERSHIP.PRESENT, MEMBERSHIP.ABSENT] },
 });
 
 const verifier = createRegistryVerifier(CAPTURE, { now: NOW });
@@ -463,7 +463,7 @@ section("trust: source binding is separate from membership");
     recs([
       feat({
         facility_id: "F-REVIEW",
-        name: "Present id, no match, not in mint_on",
+        name: "Present id, no match, weak binding",
         overture_theme: "buildings",
         gers_id: PRESENT,
       }),
@@ -567,7 +567,7 @@ section("planning: resolve before mint");
 }
 
 {
-  // 14 — mint prerequisites: only verified_absent + sufficient binding mints
+  // 14 — mint prerequisites: permitted verified membership + sufficient binding
   const reader = createMemoryResolverReader([]);
   const plan = await planImport(
     recs([
@@ -579,7 +579,7 @@ section("planning: resolve before mint");
         gers_id: ABSENT,
         gers_binding: goodBinding,
       }),
-      // present + good binding => not in mint_on => review
+      // present + good binding => mint a provisional reference identity
       feat({
         facility_id: "F-PRESENT",
         name: "Already in Overture",
@@ -621,9 +621,9 @@ section("planning: resolve before mint");
   const by = new Map(plan.items.map((i) => [i.local_id, i]));
   const g = (k) => by.get(k).outcome;
   t(
-    "mint requires verified_absent AND sufficient binding; everything else defers",
+    "mint requires a policy-permitted membership outcome AND sufficient binding",
     g("F-MINT") === OUTCOME.MINT &&
-      g("F-PRESENT") === OUTCOME.REVIEW &&
+      g("F-PRESENT") === OUTCOME.MINT &&
       g("F-WEAKBIND") === OUTCOME.REVIEW &&
       g("F-UNKNOWN") === OUTCOME.REVIEW &&
       g("F-INVALID") === OUTCOME.BLOCKED &&
@@ -993,7 +993,7 @@ section("export & inspect determinism");
       report.membership[MEMBERSHIP.UNKNOWN] === 1 &&
       report.binding[BINDING.ONBOARDING_SERVICE] === 2 &&
       report.binding[BINDING.NONE] === 1 &&
-      report.counts.mint === 1,
+      report.counts.mint === 2,
     JSON.stringify({ m: report.membership, b: report.binding, c: report.counts })
   );
 }

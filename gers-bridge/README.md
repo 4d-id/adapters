@@ -78,7 +78,7 @@ Per record, in fixed order:
 3. **Lookup completeness.** Any failed lookup → `blocked`.
 4. **Ambiguity.** Two or more distinct matches → `review`. Never mints, never auto-merges.
 5. **Mint prerequisites.** Membership must be in `policy.mint_on` (default:
-   `verified_absent` only) and binding must clear `policy.min_binding_trust`.
+   `verified_present`) and binding must clear `policy.min_binding_trust`. A manifest may also permit `verified_absent` when onboarding trusted local records that are not yet represented in GERS.
 
 Outcomes are `reuse`, `mint`, `review`, `blocked`. Only `mint` and `reuse` write
 anything; `review` and `blocked` are the operator's queue.
@@ -174,7 +174,7 @@ bridge starts inventing identity. The operator states which field means what:
   },
   "policy": {
     "min_binding_trust": "onboarding_service",
-    "mint_on": ["verified_absent"],
+    "mint_on": ["verified_present", "verified_absent"],
     "allow_mint": true
   }
 }

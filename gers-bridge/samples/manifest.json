@@ -20,6 +20,7 @@
   "policy": {
     "min_binding_trust": "onboarding_service",
     "mint_on": [
+      "verified_present",
       "verified_absent"
     ],
     "allow_mint": true

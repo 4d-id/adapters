@@ -81,7 +81,7 @@ export function parseManifest(raw) {
   // Which membership outcomes permit minting a fresh 4D-ID. `verified_absent`
   // only, by default: if we do not know whether the feature is in GERS, we do
   // not get to decide it is new.
-  const mintOn = policy.mint_on ?? [MEMBERSHIP.ABSENT];
+  const mintOn = policy.mint_on ?? [MEMBERSHIP.PRESENT];
   if (!Array.isArray(mintOn) || mintOn.length === 0) {
     throw new Error("manifest.policy.mint_on must be a non-empty array of membership outcomes");
   }
